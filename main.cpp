@@ -35,6 +35,7 @@ mat propagate_photons(Generator &gen, size_t seed, size_t N, double r1, double z
 	gen.set_seed(seed);
 	vec x = zeros<vec>(N);
 	vec y = zeros<vec>(N);
+	double cos_theta_0 = std::cos(theta_0);
 	for(size_t i=0; i<N; i++){
 		double xs = 2.0*gen.uniform()-1.0;
 		double ys = 2.0*gen.uniform()-1.0;
@@ -45,7 +46,9 @@ mat propagate_photons(Generator &gen, size_t seed, size_t N, double r1, double z
 		xs = r1*xs;
 		ys = r1*ys;
 		double psi = 2.0*M_PI*gen.uniform();
-		double theta = gen.uniform()*theta_0;
+//		double theta = gen.uniform()*theta_0;
+//		double theta = std::acos(2.0*gen.uniform() - 1.0);
+		double theta = std::acos((1.0-cos_theta_0)*gen.uniform() + cos_theta_0);
 		double cos_phi = std::cos(psi);
 		double sin_phi = std::sin(psi);
 		double tan_theta = std::tan(theta);
@@ -64,16 +67,19 @@ int main(){
 
 	Generator G;
 	double r1 = 0.0525;
-	double z0 = 2.0;
+	double z0 = 0.2;
 	double theta_0 = 0.22;
 	double x0 = r1 + z0*std::tan(theta_0);
 	size_t N = 10000000;
-	size_t bins = 301;
-	size_t seed = 0;
+	size_t bins = 101;
+	size_t seed = 3;
 	mat pos = propagate_photons(G, seed, N, r1, z0, theta_0);
+
 	vec x = pos.col(0);
 	vec y = pos.col(1);
 	mat distr = bin_photons(x, y, x0, bins, N);
+	pos = pos/r1;
+	pos.save("positions.dat", raw_ascii);
 	vec counts1 = distr.col((bins-1)/2);
 	counts1 = counts1/(accu(counts1));
 	vec x_centers = linspace<vec>(-x0, x0, bins);
