@@ -9,11 +9,11 @@ mat bin_photons(vec &x, vec &y, double x0, size_t bins, size_t N){
 	vec centers_x = linspace<vec>(-x0,x0,bins);
 	vec centers_y = linspace<vec>(-x0,x0,bins);
 	double delta = centers_x(1) - centers_x(0);
-	mat counts = zeros<mat>(bins,bins);
+	mat C = zeros<mat>(bins,bins);
 	double temp = 0.0;
 	for(size_t i=0; i<N; i++){
-		double i_t = (X(i)+x0)/delta;
-		double j_t = (Y(i)+x0)/delta;
+		double i_t = (x(i)+x0)/delta;
+		double j_t = (y(i)+x0)/delta;
 		size_t i_int = (size_t) i_t;
 		size_t j_int = (size_t) j_t;
 		double i_dec = modf(i_t,&temp);
@@ -26,11 +26,11 @@ mat bin_photons(vec &x, vec &y, double x0, size_t bins, size_t N){
 		}
 		C(i_int,j_int) = C(i_int, j_int) + 1.0;
 	}
-	C = C/((double) N);
+	//C = C/((double) N);
 	return C;
 }
 
-mat propagate_photons(Generator gen, size_t seed, size_t N, double r1, double z0, double theta_0){
+mat propagate_photons(Generator &gen, size_t seed, size_t N, double r1, double z0, double theta_0){
 
 	gen.set_seed(seed);
 	vec x = zeros<vec>(N);
@@ -51,7 +51,6 @@ mat propagate_photons(Generator gen, size_t seed, size_t N, double r1, double z0
 		double tan_theta = std::tan(theta);
 		x(i) = xs + z0*cos_phi*tan_theta;
 		y(i) = ys + z0*sin_phi*tan_theta;
-		//R(i) = std::sqrt(std::pow(xs+z0*cos_phi*tan_theta,2.0) + std::pow(ys+z0*sin_phi*tan_theta,2.0));
 	}
 	mat positions = zeros<mat>(N,2);
 	positions.col(0) = x;
@@ -63,31 +62,32 @@ mat propagate_photons(Generator gen, size_t seed, size_t N, double r1, double z0
 
 int main(){
 
-	Generator g(0);
-	for(int i=0; i<10; i++){
-		std::cout << g.uniform() << std::endl;
-	}
-	std::cout << "count is " << g.count << std::endl;
-
-	std::cout << std::endl;
-
-	Generator f(1);
-
-	for(int i=0; i<10; i++){
-		std::cout << f.uniform() << std::endl;
-	}
-
-	std::cout << "count is " << f.count << std::endl;
-
-	mat A = randu<mat>(4,5);
-	std::cout << A << std::endl;
-
-
+	Generator G;
 	double r1 = 0.0525;
-	double z0 = 0.4;
+	double z0 = 2.0;
 	double theta_0 = 0.22;
 	double x0 = r1 + z0*std::tan(theta_0);
-	size_t N = 1000000;
+	size_t N = 10000000;
+	size_t bins = 301;
+	size_t seed = 0;
+	mat pos = propagate_photons(G, seed, N, r1, z0, theta_0);
+	vec x = pos.col(0);
+	vec y = pos.col(1);
+	mat distr = bin_photons(x, y, x0, bins, N);
+	vec counts1 = distr.col((bins-1)/2);
+	counts1 = counts1/(accu(counts1));
+	vec x_centers = linspace<vec>(-x0, x0, bins);
+	uvec counts_2 = arma::hist(y, x_centers);
+	vec counts2 = conv_to<vec>::from(counts_2);
+	counts2 = counts2/((double) N);
+	counts2.save("y2.dat", raw_ascii);
+	counts1.save("y.dat", raw_ascii);
+	distr.save("distribution.dat", raw_ascii);
+
+
+
+
+	/*
 	double N_double = (double) N;
 	size_t bins = 100;
 	Generator gen(10);
@@ -186,6 +186,7 @@ int main(){
 	distr.col(0) = y_g;
 	distr.col(1) = c;
 	distr.save("counts.dat",raw_ascii);
+	*/
 
 
 
