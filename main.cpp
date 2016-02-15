@@ -2,13 +2,12 @@
 #include <iostream>
 #include <armadillo>
 #include <cmath>
+#include <string>
+#include <sstream>
 
 using namespace arma;
 
-mat bin_photons(vec &x, vec &y, double x0, size_t bins, size_t N){
-	vec centers_x = linspace<vec>(-x0,x0,bins);
-	vec centers_y = linspace<vec>(-x0,x0,bins);
-	double delta = centers_x(1) - centers_x(0);
+mat bin_photons(vec &x, vec &y, double x0, size_t bins, size_t N, double delta){
 	mat C = zeros<mat>(bins,bins);
 	double temp = 0.0;
 	for(size_t i=0; i<N; i++){
@@ -26,7 +25,7 @@ mat bin_photons(vec &x, vec &y, double x0, size_t bins, size_t N){
 		}
 		C(i_int,j_int) = C(i_int, j_int) + 1.0;
 	}
-	//C = C/((double) N);
+	C = C/((double) N);
 	return C;
 }
 
@@ -65,19 +64,70 @@ mat propagate_photons(Generator &gen, size_t seed, size_t N, double r1, double z
 
 int main(){
 
+	/*
 	Generator G;
 	double r1 = 0.0525;
 	double z0 = 0.2;
 	double theta_0 = 0.22;
 	double x0 = r1 + z0*std::tan(theta_0);
-	size_t N = 10000000;
+	size_t N = 1000000;
 	size_t bins = 101;
-	size_t seed = 3;
+	size_t seed = 0;
+	std::string filename = "distr";
+	vec centers = linspace<vec>(-x0,x0,bins);
+	double delta = centers(1) - centers(0);
 	mat pos = propagate_photons(G, seed, N, r1, z0, theta_0);
-
 	vec x = pos.col(0);
 	vec y = pos.col(1);
-	mat distr = bin_photons(x, y, x0, bins, N);
+	mat distr = bin_photons(x, y, x0, bins, N, delta);
+	vec distr_y = distr.col((bins-1)/2);
+	mat counts(bins,2);
+	counts.col(0) = centers;
+	counts.col(1) = distr_y;
+	
+	*/
+
+	Generator G;
+	std::string filename = "distr";
+	double r1 = 0.0525;
+	double theta_0 = 0.22;
+	size_t N = 10000000;
+	size_t bins = 101;
+	size_t seed = 2;
+	int num_z0 = 11;
+	int num_avg = 20;
+	vec z = linspace<vec>(2.0*r1, 10.0*r1,num_z0);
+	double z0 = z(num_z0-1);
+	double rc = r1 + z0*std::tan(theta_0);
+	vec centers = linspace<vec>(-rc,rc,bins);
+	double delta = centers(1)-centers(0);
+	for(int i=0; i<num_z0; i++){
+		std::ostringstream s; 
+		s << filename << i << ".dat";
+		std::string file = s.str();
+		vec distr_y_tot = zeros<vec>(bins);
+		for(int j=0; j<num_avg; j++){
+			mat pos = propagate_photons(G, seed, N, r1, z(i), theta_0);
+			vec x = pos.col(0);
+			vec y = pos.col(1);
+			mat distr = bin_photons(x, y, rc, bins, N, delta);
+			vec distr_y = distr.col((bins-1)/2);
+			distr_y_tot = distr_y_tot + distr_y;
+			seed++;
+		}
+		distr_y_tot = distr_y_tot/((double) num_avg);
+		mat counts(bins,2);
+		counts.col(0) = centers;
+		counts.col(1) = distr_y_tot;
+		counts.save(file,raw_ascii);
+	}
+	
+		
+
+
+
+	/*
+	mat distr = bin_photons(x, y, x0, bins, N, delta);
 	pos = pos/r1;
 	pos.save("positions.dat", raw_ascii);
 	vec counts1 = distr.col((bins-1)/2);
@@ -89,6 +139,7 @@ int main(){
 	counts2.save("y2.dat", raw_ascii);
 	counts1.save("y.dat", raw_ascii);
 	distr.save("distribution.dat", raw_ascii);
+	*/
 
 
 
