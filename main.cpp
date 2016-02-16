@@ -29,9 +29,7 @@ mat bin_photons(vec &x, vec &y, double x0, size_t bins, size_t N, double delta){
 	return C;
 }
 
-mat propagate_photons(Generator &gen, size_t seed, size_t N, double r1, double z0, double theta_0){
-
-	gen.set_seed(seed);
+mat propagate_photons(Generator &gen, size_t N, double r1, double z0, double theta_0){
 	vec x = zeros<vec>(N);
 	vec y = zeros<vec>(N);
 	double cos_theta_0 = std::cos(theta_0);
@@ -61,68 +59,94 @@ mat propagate_photons(Generator &gen, size_t seed, size_t N, double r1, double z
 }	
 
 
+double coupling_efficiency(Generator &gen, size_t seed, size_t N, double r1, double z0, double theta_0, double r2, double theta_a, double offset){
+	double r2_square = r2*r2;
+	double cos_theta_0 = std::cos(theta_0);
+	size_t count = 0;
+	for(size_t i=0; i<N; i++){
+		double xs = 2.0*gen.uniform()-1.0;
+		double ys = 2.0*gen.uniform()-1.0;
+		while((xs*xs+ys*ys) > 1.0){
+			xs = 2.0*gen.uniform()-1.0;
+			ys = 2.0*gen.uniform()-1.0;
+		}
+		xs = r1*xs;
+		ys = r1*ys;
+		double psi = 2.0*M_PI*gen.uniform();
+//		double theta = gen.uniform()*theta_0;
+//		double theta = std::acos(2.0*gen.uniform() - 1.0);
+		double theta = std::acos((1.0-cos_theta_0)*gen.uniform() + cos_theta_0);
+		double cos_phi = std::cos(psi);
+		double sin_phi = std::sin(psi);
+		double tan_theta = std::tan(theta);
+		double x = xs + z0*cos_phi*tan_theta;
+		double y = ys + z0*sin_phi*tan_theta;
+		if((x*x+(y-offset)*(y-offset))<r2_square){
+			if(theta <= theta_a){
+				count++;
+			}
+		}
+	}
+	double c = ((double) count)/((double) N);
+	return c;
+}
+
+
+
+
 
 int main(){
 
-	/*
-	Generator G;
-	double r1 = 0.0525;
-	double z0 = 0.2;
-	double theta_0 = 0.22;
-	double x0 = r1 + z0*std::tan(theta_0);
-	size_t N = 1000000;
-	size_t bins = 101;
-	size_t seed = 0;
-	std::string filename = "distr";
-	vec centers = linspace<vec>(-x0,x0,bins);
-	double delta = centers(1) - centers(0);
-	mat pos = propagate_photons(G, seed, N, r1, z0, theta_0);
-	vec x = pos.col(0);
-	vec y = pos.col(1);
-	mat distr = bin_photons(x, y, x0, bins, N, delta);
-	vec distr_y = distr.col((bins-1)/2);
-	mat counts(bins,2);
-	counts.col(0) = centers;
-	counts.col(1) = distr_y;
-	
-	*/
-
-	Generator G;
+	Generator G(0);
 	std::string filename = "distr";
 	double r1 = 0.0525;
-	double theta_0 = 0.22;
+	double r2 = 2.0*r1;
+	double theta_0 = 0.222;
+	double theta_a = theta_0;
 	size_t N = 10000000;
-	size_t bins = 101;
-	size_t seed = 2;
-	int num_z0 = 11;
-	int num_avg = 20;
-	vec z = linspace<vec>(2.0*r1, 10.0*r1,num_z0);
+	size_t bins = 201;
+	size_t seed = 100;
+	int num_z0 = 20;
+	int num_avg = 50;
+	vec z = linspace<vec>(r1, 20.0*r1,num_z0);
 	double z0 = z(num_z0-1);
 	double rc = r1 + z0*std::tan(theta_0);
 	vec centers = linspace<vec>(-rc,rc,bins);
 	double delta = centers(1)-centers(0);
+	G.seed = seed;
 	for(int i=0; i<num_z0; i++){
 		std::ostringstream s; 
 		s << filename << i << ".dat";
 		std::string file = s.str();
 		vec distr_y_tot = zeros<vec>(bins);
 		for(int j=0; j<num_avg; j++){
-			mat pos = propagate_photons(G, seed, N, r1, z(i), theta_0);
+			mat pos = propagate_photons(G, N, r1, z(i), theta_0);
 			vec x = pos.col(0);
 			vec y = pos.col(1);
 			mat distr = bin_photons(x, y, rc, bins, N, delta);
 			vec distr_y = distr.col((bins-1)/2);
 			distr_y_tot = distr_y_tot + distr_y;
-			seed++;
 		}
 		distr_y_tot = distr_y_tot/((double) num_avg);
 		mat counts(bins,2);
-		counts.col(0) = centers;
+		counts.col(0) = centers/r1;
 		counts.col(1) = distr_y_tot;
 		counts.save(file,raw_ascii);
+		std::cout << "z number: " << i << std::endl;
 	}
-	
-		
+	z = linspace<vec>(0.0, 2.0, 100);
+	vec eps = zeros<vec>(100);
+	mat eps_z = zeros<mat>(100,2);
+	double offset = 0.0;
+	for(int i=0; i<100; i++){
+		eps(i) = coupling_efficiency(G, seed, N, r1, z(i), theta_0, r2, theta_a, offset);
+	}
+	eps_z.col(0) = z;
+	eps_z.col(1) = eps;
+	eps_z.save("efficiency.dat", raw_ascii);
+	std::cout << coupling_efficiency(G, seed, N, r1, z(1), theta_0, r2, theta_a, offset);
+
+
 
 
 
