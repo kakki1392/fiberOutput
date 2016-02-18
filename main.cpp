@@ -29,6 +29,28 @@ mat bin_photons(vec &x, vec &y, double x0, size_t bins, size_t N, double delta){
 	return C;
 }
 
+mat bin_photons_absorption(vec &x, vec &y, vec &s, double x0, size_t bins, size_t N, double delta, double alfa){
+	mat C = zeros<mat>(bins,bins);
+	double temp = 0.0;
+	for(size_t i=0; i<N; i++){
+		double i_t = (x(i)+x0)/delta;
+		double j_t = (y(i)+x0)/delta;
+		size_t i_int = (size_t) i_t;
+		size_t j_int = (size_t) j_t;
+		double i_dec = modf(i_t,&temp);
+		double j_dec = modf(j_t,&temp);
+		if(i_dec >= 0.5){
+			i_int++;
+		}
+		if(j_dec >= 0.5){
+			j_int++;
+		}
+		C(i_int,j_int) = C(i_int, j_int) + std::exp(-alfa*s(i));
+	}
+	C = C/((double) N);
+	return C;
+}
+
 mat propagate_photons(Generator &gen, size_t N, double r1, double z0, double theta_0){
 	vec x = zeros<vec>(N);
 	vec y = zeros<vec>(N);
@@ -62,6 +84,44 @@ mat propagate_photons(Generator &gen, size_t N, double r1, double z0, double the
 	return positions;
 }	
 
+mat propagate_photons_absorption(Generator &gen, size_t N, double r1, double z0, double theta_0){
+	vec x = zeros<vec>(N);
+	vec y = zeros<vec>(N);
+	vec s = zeros<vec>(N);
+	double cos_theta_0 = std::cos(theta_0);
+	double z0_square = z0*z0;
+	for(size_t i=0; i<N; i++){
+		double xs = 2.0*gen.uniform()-1.0;
+		double ys = 2.0*gen.uniform()-1.0;
+		//double xs = gen.gaussian();
+		//double ys = gen.gaussian();
+		while((xs*xs+ys*ys) > 1.0){
+			xs = 2.0*gen.uniform()-1.0;
+			ys = 2.0*gen.uniform()-1.0;
+			//xs = gen.gaussian();
+			//ys = gen.gaussian();
+		}
+		xs = r1*xs;
+		ys = r1*ys;
+		double psi = 2.0*M_PI*gen.uniform();
+//		double theta = gen.uniform()*theta_0;
+//		double theta = std::acos(2.0*gen.uniform() - 1.0);
+		double theta = std::acos((1.0-cos_theta_0)*gen.uniform() + cos_theta_0);
+		double cos_phi = std::cos(psi);
+		double sin_phi = std::sin(psi);
+		double tan_theta = std::tan(theta);
+		double x_temp = xs + z0*cos_phi*tan_theta;
+		double y_temp = ys + z0*sin_phi*tan_theta;
+		s(i) = std::sqrt((x_temp-xs)*(x_temp-xs) + (y_temp-ys)*(y_temp-ys) + z0_square);
+		x(i) = x_temp;
+		y(i) = y_temp;
+	}
+	mat ret = zeros<mat>(N,3);
+	ret.col(0) = x;
+	ret.col(1) = y;
+	ret.col(2) = s;
+	return ret;
+}
 
 double coupling_efficiency(Generator &gen, size_t seed, size_t N, double r1, double z0, double theta_0, double r2, double theta_a, double offset){
 	double r2_square = r2*r2;
@@ -104,35 +164,43 @@ int main(){
 	Generator G(0);
 	std::string filename = "distr";
 	std::string filename2 = "surf";
+	std::string filename3 = "abs";
 	double r1 = 0.0525;
 	double r2 = r1;
-	double theta_0 = 0.222;
+	double theta_0 = 0.22;
 	double theta_a = theta_0;
-	size_t N = 100000;
-	size_t bins = 301;
-	size_t seed = 70;
-	int num_z0 = 11;
-	int num_avg = 80;
+	size_t N = 1000000;
+	size_t bins = 501;
+	size_t seed = 200;
+	int num_z0 = 4;
+	int num_avg = 300;
 	vec z = linspace<vec>(0.0, 1.0 ,num_z0);
 	double z0 = z(num_z0-1);
 	double rc = r1 + z0*std::tan(theta_0);
 	vec centers = linspace<vec>(-rc,rc,bins);
 	double delta = centers(1)-centers(0);
 	G.seed = seed;
+	double alfa = 2.0;
 	for(int i=0; i<num_z0; i++){
 		std::ostringstream s; 
 		std::ostringstream s2;
+		std::ostringstream s3;
 		s << filename << i << ".dat";
 		s2 << filename2 << i << ".dat";
+		s3 << filename3 << i << ".dat";
 		std::string file = s.str();
 		std::string file2 = s2.str();
+		std::string file3 = s3.str();
 		vec distr_y_tot = zeros<vec>(bins);
 		mat distr_tot = zeros<mat>(bins,bins);
 		for(int j=0; j<num_avg; j++){
 			mat pos = propagate_photons(G, N, r1, z(i), theta_0);
+			//mat pos = propagate_photons_absorption(G,N,r1,z(i),theta_0);
 			vec x = pos.col(0);
 			vec y = pos.col(1);
+			//vec s = pos.col(2);
 			mat distr = bin_photons(x, y, rc, bins, N, delta);
+			//mat distr = bin_photons_absorption(x,y,s,rc,bins,N,delta,alfa);
 			vec distr_y = distr.col((bins-1)/2);
 			distr_y_tot = distr_y_tot + distr_y;
 			distr_tot = distr_tot + distr;
@@ -146,6 +214,7 @@ int main(){
 		distr_tot.save(file2, raw_ascii);
 		std::cout << "z number: " << i << std::endl;
 	}
+	std::cout << "number of random numbers generated " << G.count << std::endl;
 	/*
 	z = linspace<vec>(0.0, 2.0, 100);
 	vec eps = zeros<vec>(100);
