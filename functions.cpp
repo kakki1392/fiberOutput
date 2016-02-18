@@ -55,3 +55,9 @@ double Generator::uniform(){
 	count++;
 	return ret;
 }
+
+double Generator::gaussian(){
+	double ret = gsl_ran_ugaussian(r);
+	count++;
+	return ret;
+}

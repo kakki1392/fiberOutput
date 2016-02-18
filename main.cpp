@@ -36,9 +36,13 @@ mat propagate_photons(Generator &gen, size_t N, double r1, double z0, double the
 	for(size_t i=0; i<N; i++){
 		double xs = 2.0*gen.uniform()-1.0;
 		double ys = 2.0*gen.uniform()-1.0;
+		//double xs = gen.gaussian();
+		//double ys = gen.gaussian();
 		while((xs*xs+ys*ys) > 1.0){
 			xs = 2.0*gen.uniform()-1.0;
 			ys = 2.0*gen.uniform()-1.0;
+			//xs = gen.gaussian();
+			//ys = gen.gaussian();
 		}
 		xs = r1*xs;
 		ys = r1*ys;
@@ -99,16 +103,17 @@ int main(){
 
 	Generator G(0);
 	std::string filename = "distr";
+	std::string filename2 = "surf";
 	double r1 = 0.0525;
-	double r2 = 2.0*r1;
+	double r2 = r1;
 	double theta_0 = 0.222;
 	double theta_a = theta_0;
-	size_t N = 10000000;
-	size_t bins = 201;
-	size_t seed = 100;
-	int num_z0 = 20;
-	int num_avg = 50;
-	vec z = linspace<vec>(r1, 20.0*r1,num_z0);
+	size_t N = 100000;
+	size_t bins = 301;
+	size_t seed = 70;
+	int num_z0 = 11;
+	int num_avg = 80;
+	vec z = linspace<vec>(0.0, 1.0 ,num_z0);
 	double z0 = z(num_z0-1);
 	double rc = r1 + z0*std::tan(theta_0);
 	vec centers = linspace<vec>(-rc,rc,bins);
@@ -116,9 +121,13 @@ int main(){
 	G.seed = seed;
 	for(int i=0; i<num_z0; i++){
 		std::ostringstream s; 
+		std::ostringstream s2;
 		s << filename << i << ".dat";
+		s2 << filename2 << i << ".dat";
 		std::string file = s.str();
+		std::string file2 = s2.str();
 		vec distr_y_tot = zeros<vec>(bins);
+		mat distr_tot = zeros<mat>(bins,bins);
 		for(int j=0; j<num_avg; j++){
 			mat pos = propagate_photons(G, N, r1, z(i), theta_0);
 			vec x = pos.col(0);
@@ -126,14 +135,18 @@ int main(){
 			mat distr = bin_photons(x, y, rc, bins, N, delta);
 			vec distr_y = distr.col((bins-1)/2);
 			distr_y_tot = distr_y_tot + distr_y;
+			distr_tot = distr_tot + distr;
 		}
 		distr_y_tot = distr_y_tot/((double) num_avg);
+		distr_tot = distr_tot/((double) num_avg);
 		mat counts(bins,2);
 		counts.col(0) = centers/r1;
 		counts.col(1) = distr_y_tot;
 		counts.save(file,raw_ascii);
+		distr_tot.save(file2, raw_ascii);
 		std::cout << "z number: " << i << std::endl;
 	}
+	/*
 	z = linspace<vec>(0.0, 2.0, 100);
 	vec eps = zeros<vec>(100);
 	mat eps_z = zeros<mat>(100,2);
@@ -145,6 +158,7 @@ int main(){
 	eps_z.col(1) = eps;
 	eps_z.save("efficiency.dat", raw_ascii);
 	std::cout << coupling_efficiency(G, seed, N, r1, z(1), theta_0, r2, theta_a, offset);
+	*/
 
 
 

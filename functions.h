@@ -1,4 +1,5 @@
 #include <gsl/gsl_rng.h>
+#include <gsl/gsl_randist.h>
 
 class Generator{
 	public:
@@ -11,6 +12,7 @@ class Generator{
 		const gsl_rng_type * T;
 		gsl_rng * r;
 		double uniform();
+		double gaussian();
 
 };
 
